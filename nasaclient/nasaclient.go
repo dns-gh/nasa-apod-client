@@ -1,8 +1,10 @@
 package nasaclient
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -80,4 +82,34 @@ func (n *NasaApodClient) FetchAPOD(date string, hd bool) (*Apod, error) {
 // in 'hd' format potentially.
 func (n *NasaApodClient) FetchTodayAPOD(hd bool) (*Apod, error) {
 	return n.FetchAPOD("", hd)
+}
+
+func loadImage(uri string) (string, error) {
+	resp, err := http.Get(uri)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("error request status: %s != 200", resp.Status)
+	}
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, resp.Body); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// FetchHD fetches the apod today's image and description.
+func (n *NasaApodClient) FetchHD() (string, string, error) {
+	apod, err := n.FetchTodayAPOD(true)
+	if err != nil {
+		return "", "", err
+	}
+	img, err := loadImage(apod.URL)
+	if err != nil {
+		return "", "", err
+	}
+	return apod.Explanation, img, nil
 }
